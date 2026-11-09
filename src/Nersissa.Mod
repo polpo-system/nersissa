@@ -309,6 +309,8 @@ BEGIN
   ListOf(P, "Categories", "Nersissa.Category", 10, -74, cw, h - 84);
   ListOf(P, "Packages", "Nersissa.Package", x, -74, w - x - 10, ph);
   F := Add(P, "TextGadgets.New", "Details", x, -82 - ph, w - x - 10, h - 92 - ph);
+  Attributes.SetBool(P, "Locked", TRUE);  (* the gadgets stay where they are: a middle drag on the edge of a list
+    scrolls, it does not move the list *)
   IF category = "" THEN category := All END;
   Show(P);
   Objects.NewObj := D
