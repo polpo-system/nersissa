@@ -5,7 +5,8 @@ MODULE Nersissa;  (** the packages of portia in a panel: categories at the left,
   a window of its own. A middle click on a category lists its packages, a middle click on a package shows
   its description; the buttons act on that package through portia's commands (portia.Install /y,
   portia.Remove /y), whose messages go to System.Log. In the lists, [x] is an installed package, [ ] one
-  that is not, [u] one with a newer version in the tree. *)
+  that is not, [u] one with a newer version in the tree, [-] one that has nothing for this machine (its
+  modules are for other architectures, portia.ForArch). *)
 
 IMPORT Modules, Objects, Display, Texts, Oberon, Out, Gadgets, Attributes, Panels, Documents, PanelDocs, Desktops,
   DocWindows, Windows, Lists, TextGadgets0, Versions, portia;
@@ -149,7 +150,10 @@ BEGIN
   Clear(L); n := 0;
   WHILE portia.GetPackage(n, name, cat, version, inst, desc, inBase, remote) DO
     IF Shown(category, cat, inst, version) THEN
-      IF Upgr(inst, version) THEN item := "[u] " ELSIF inst # "" THEN item := "[x] " ELSE item := "[ ] " END;
+      IF Upgr(inst, version) THEN item := "[u] " ELSIF inst # "" THEN item := "[x] "
+      ELSIF ~portia.ForArch(name) THEN item := "[-] "  (* nothing for this machine *)
+      ELSE item := "[ ] "
+      END;
       Append(item, name); Append(item, "  ");
       IF Upgr(inst, version) THEN Append(item, inst); Append(item, " > ") END;
       Append(item, version);
@@ -198,7 +202,8 @@ BEGIN
   IF ~found THEN state := ""
   ELSE
     COPY(name, state); Append(state, ": ");
-    IF inst = "" THEN Append(state, "not installed")
+    IF (inst = "") & ~portia.ForArch(name) THEN Append(state, "nothing for this machine")
+    ELSIF inst = "" THEN Append(state, "not installed")
     ELSIF Upgr(inst, version) THEN Append(state, "installed "); Append(state, inst); Append(state, ", can be upgraded")
     ELSE Append(state, "installed")
     END
@@ -265,6 +270,7 @@ VAR context: Objects.Object; caption: Name;
 BEGIN
   IF current = "" THEN RETURN END;
   context := Gadgets.context;
+  IF ~portia.ForArch(current) THEN Describe(context); RETURN END;  (* the state says why: nothing to install *)
   Attributes.GetString(Find(context, "Action"), "Caption", caption);
   IF caption = "Remove" THEN Portia("portia.Remove") ELSE Portia("portia.Install") END;
   Show(context)
@@ -275,7 +281,8 @@ PROCEDURE Upgrade*;
 VAR context: Objects.Object;
 BEGIN
   IF current = "" THEN RETURN END;
-  context := Gadgets.context; Portia("portia.Install"); Show(context)
+  context := Gadgets.context; IF ~portia.ForArch(current) THEN Describe(context); RETURN END;
+  Portia("portia.Install"); Show(context)
 END Upgrade;
 
 (** Nersissa.Sync  the newest package tree (portia.Sync) *)
