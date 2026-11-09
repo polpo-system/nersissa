@@ -1,7 +1,7 @@
 MODULE NersissaTest;  (* the panel of Nersissa: its lists filled from portia's tree, a category chosen,
   a package described; nothing is installed or removed *)
 
-IMPORT Objects, Documents, Gadgets, Attributes, Lists, TextGadgets0, Texts, Out, portia, Nersissa;
+IMPORT Objects, Documents, Gadgets, Attributes, Lists, TextGadgets0, Texts, Out, Versions, portia, Nersissa;
 
 TYPE
   Name = ARRAY 64 OF CHAR;
@@ -22,6 +22,16 @@ BEGIN
   j := 0; WHILE (t[j] # 0X) & (i < LEN(s) - 1) DO s[i] := t[j]; INC(i); INC(j) END;
   s[i] := 0X
 END Append;
+
+(* the start of the item of a package: its mark and its name *)
+PROCEDURE Mark(VAR name, inst, version: ARRAY OF CHAR; VAR want: ARRAY OF CHAR);
+BEGIN
+  IF inst = "" THEN IF portia.ForArch(name) THEN COPY("[ ] ", want) ELSE COPY("[-] ", want) END
+  ELSIF ~Versions.AtLeast(inst, version) THEN COPY("[u] ", want)
+  ELSE COPY("[x] ", want)
+  END;
+  Append(want, name); Append(want, "  ")
+END Mark;
 
 PROCEDURE Count(L: Lists.List): LONGINT;
 VAR it: Lists.Item; n: LONGINT;
@@ -49,7 +59,7 @@ END FirstLine;
 PROCEDURE Run*;
 VAR D: Documents.Document; P, obj: Objects.Object; cats, pkgs: Lists.List; it: Lists.Item;
   total, n, incat: LONGINT; name, cat, version, inst, c, v, i2, s, want, caption: Name; desc: ARRAY 256 OF CHAR;
-  inBase, remote: BOOLEAN;
+  inBase, remote, ok: BOOLEAN;
 BEGIN
   checks := 0; fails := 0;
   Nersissa.NewDoc; D := Objects.NewObj(Documents.Document); Check("the document", D # NIL);
@@ -61,6 +71,12 @@ BEGIN
   total := 0; WHILE portia.GetPackage(total, name, cat, version, inst, desc, inBase, remote) DO INC(total) END;
   Check("a package tree", total > 0);
   Check("all packages listed at first", Count(pkgs) = total);
+  ok := TRUE; it := pkgs.items; n := 0;  (* each marked as portia sees it *)
+  WHILE (it # NIL) & portia.GetPackage(n, name, cat, version, inst, desc, inBase, remote) DO
+    Mark(name, inst, version, want); IF ~Starts(it.s, want) THEN ok := FALSE END;
+    it := it.next; INC(n)
+  END;
+  Check("the marks of all packages", ok);
   Check("all, installed, upgradable first", Starts(cats.items.s, "all (") & Starts(cats.items.next.s, "installed (")
     & Starts(cats.items.next.next.s, "upgradable ("));
 
@@ -76,8 +92,7 @@ BEGIN
     END;
 
     (* the package, chosen as by a middle click *)
-    IF inst = "" THEN want := "[ ] " ELSIF inst # version THEN want := "[u] " ELSE want := "[x] " END;
-    Append(want, name); Append(want, "  ");
+    Mark(name, inst, version, want);
     it := Item(pkgs, want); Check("the package listed with its state", it # NIL);
     IF it # NIL THEN
       pkgs.pointed := it; Gadgets.executorObj := pkgs; Gadgets.context := P; Nersissa.Package;
